@@ -167,6 +167,17 @@ theorem ext {g h : M ⊗ N →ₛₗ[σ₁₂] P₂} (H : (mk R M N).compr₂ₛ
 
 attribute [local ext high] ext
 
+@[simp]
+theorem lift_add (f g : M →ₛₗ[σ₁₂] N →ₛₗ[σ₁₂] P₂) : lift (f + g) = lift f + lift g := by
+  ext x y
+  exact LinearMap.congr_fun₂ rfl x y
+
+@[simp]
+lemma lift_smul (c : R₂) (f : M →ₛₗ[σ₁₂] N →ₛₗ[σ₁₂] P₂) :
+    TensorProduct.lift (c • f) = c • TensorProduct.lift f := by
+  ext x y
+  exact LinearMap.congr_fun₂ rfl x y
+
 variable (M N P₂ σ₁₂) in
 /-- Linearly constructing a semilinear map `M ⊗ N → P` given a bilinear map `M → N → P`
 with the property that its composition with the canonical bilinear map `M → N → M ⊗ N` is
