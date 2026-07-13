@@ -228,6 +228,162 @@ liftIsometry 𝕜 X Y _ (tprodL 𝕜) = ContinuousLinearMap.id 𝕜 (X ⊗[𝕜]
   apply ContinuousLinearMap.coe_injective
   ext; simp
 
+section map
+
+variable {X' X'' Y' Y'' : Type*}
+variable [SeminormedAddCommGroup X'] [NormedSpace 𝕜 X']
+variable [SeminormedAddCommGroup X''] [NormedSpace 𝕜 X'']
+variable [SeminormedAddCommGroup Y'] [NormedSpace 𝕜 Y']
+variable [SeminormedAddCommGroup Y''] [NormedSpace 𝕜 Y'']
+variable (g₁ : X' →L[𝕜] X'') (g₂ : Y' →L[𝕜] Y'') (f₁ : X →L[𝕜] X') (f₂ : Y →L[𝕜] Y')
+
+/-- Let `Eᵢ` and `E'ᵢ` be two families of normed `𝕜`-vector spaces.
+Let `f` be a family of continuous `𝕜`-linear maps between `Eᵢ` and `E'ᵢ`, i.e.
+`f : Πᵢ Eᵢ →L[𝕜] E'ᵢ`, then there is an induced continuous linear map
+`⨂ᵢ Eᵢ → ⨂ᵢ E'ᵢ` by `⨂ aᵢ ↦ ⨂ fᵢ aᵢ`. -/
+-- noncomputable def mapL : (X ⊗[𝕜] Y) →L[𝕜] (X' ⊗[𝕜] Y') := by
+--   liftIsometry 𝕜 X Y _ <| (tprodL 𝕜).bilinearComp f
+noncomputable def mapL : (X ⊗[𝕜] Y) →L[𝕜] (X' ⊗[𝕜] Y') :=
+  liftIsometry 𝕜 X Y _ ((tprodL 𝕜).bilinearComp f₁ f₂)
+
+@[simp]
+theorem mapL_coe : (mapL f₁ f₂).toLinearMap = map f₁.toLinearMap f₂.toLinearMap := by
+  ext; simp [mapL]
+
+@[simp]
+theorem mapL_apply (x : X ⊗[𝕜] Y) : mapL f₁ f₂ x = (map f₁.toLinearMap f₂.toLinearMap) x := by
+  rfl
+
+/-- Given submodules `pᵢ ⊆ Eᵢ`, this is the natural map: `⨂[𝕜] i, pᵢ → ⨂[𝕜] i, Eᵢ`.
+This is the continuous version of `PiTensorProduct.mapIncl`. -/
+@[simp]
+noncomputable def mapLIncl (p₁ : Submodule 𝕜 X) (p₂ : Submodule 𝕜 Y) :
+    (p₁ ⊗[𝕜] p₂) →L[𝕜] X ⊗[𝕜] Y :=
+  mapL p₁.subtypeL p₂.subtypeL
+
+theorem mapL_comp : mapL (g₁ ∘L f₁) (g₂ ∘L f₂) = mapL g₁ g₂ ∘L mapL f₁ f₂ := by
+  apply ContinuousLinearMap.coe_injective
+  ext; simp
+
+theorem liftIsometry_comp_mapL (h : X' →L[𝕜] Y' →L[𝕜] F) :
+    liftIsometry 𝕜 X' Y' F h ∘L mapL f₁ f₂ = liftIsometry 𝕜 X Y F (h.bilinearComp f₁ f₂) := by
+  apply ContinuousLinearMap.coe_injective
+  ext; simp
+
+@[simp]
+theorem mapL_id : mapL (ContinuousLinearMap.id 𝕜 X) (ContinuousLinearMap.id 𝕜 Y) = ContinuousLinearMap.id _ _ := by
+  apply ContinuousLinearMap.coe_injective
+  ext; simp
+
+@[simp]
+theorem mapL_one : mapL (1 : X →L[𝕜] X) (1 : Y →L[𝕜] Y) = 1 :=
+  mapL_id
+
+theorem mapL_mul (f₁₁ f₁₂ : X →L[𝕜] X) (f₂₁ f₂₂ : Y →L[𝕜] Y) :
+    mapL (f₁₁ * f₁₂) (f₂₁ * f₂₂) = mapL f₁₁ f₂₁ * mapL f₁₂ f₂₂ :=
+  mapL_comp _ _ _ _
+
+/-- Upgrading `PiTensorProduct.mapL` to a `MonoidHom` when `E = E'`. -/
+@[simps]
+noncomputable def mapLMonoidHom : (X →L[𝕜] X) × (Y →L[𝕜] Y) →* ((X ⊗[𝕜] Y) →L[𝕜] (X ⊗[𝕜] Y)) where
+  toFun fg := mapL fg.1 fg.2
+  map_one' := mapL_one
+  map_mul' fg₁ fg₂ := mapL_mul fg₁.1 fg₂.1 fg₁.2 fg₂.2
+
+@[simp]
+protected theorem mapL_pow (f₁ : X →L[𝕜] X) (f₂ : Y →L[𝕜] Y) (n : ℕ) :
+    mapL (f₁ ^ n) (f₂ ^ n) = mapL f₁ f₂ ^ n :=
+  mapLMonoidHom.map_pow (f₁, f₂) n
+
+-- -- We redeclare `ι` here, and later dependent arguments,
+-- -- to avoid the `[Fintype ι]` assumption present throughout the rest of the file.
+-- open Function in
+-- private theorem mapL_add_smul_aux {ι : Type*}
+--     {E : ι → Type*} [∀ i, SeminormedAddCommGroup (E i)] [∀ i, NormedSpace 𝕜 (E i)]
+--     {E' : ι → Type*} [∀ i, SeminormedAddCommGroup (E' i)] [∀ i, NormedSpace 𝕜 (E' i)]
+--     (f : (i : ι) → E i →L[𝕜] E' i) [DecidableEq ι] (i : ι) (u : E i →L[𝕜] E' i) :
+--     (fun j ↦ (update f i u j).toLinearMap) =
+--       update (fun j ↦ (f j).toLinearMap) i u.toLinearMap := by
+--   grind
+
+protected theorem mapL_add_left (u v : X →L[𝕜] X') (f₂ : Y →L[𝕜] Y') :
+    mapL (u + v) f₂ = mapL u f₂ + mapL v f₂ := by
+  apply ContinuousLinearMap.coe_injective
+  ext x y
+  simp [TensorProduct.add_tmul]
+
+protected theorem mapL_add_right (f₁ : X →L[𝕜] X') (u v : Y →L[𝕜] Y') :
+    mapL f₁ (u + v) = mapL f₁ u + mapL f₁ v := by
+  apply ContinuousLinearMap.coe_injective
+  ext x y
+  simp [TensorProduct.tmul_add]
+
+protected theorem mapL_smul_left (c : 𝕜) (u : X →L[𝕜] X') :
+    mapL (c • u) f₂ = c • mapL u f₂ := by
+  apply ContinuousLinearMap.coe_injective
+  ext
+  simp [TensorProduct.smul_tmul]
+
+protected theorem mapL_smul_right (c : 𝕜) (u : Y →L[𝕜] Y') :
+    mapL f₁ (c • u) = c • mapL f₁ u := by
+  apply ContinuousLinearMap.coe_injective
+  ext
+  simp [TensorProduct.tmul_smul]
+
+theorem opNorm_mapL : ‖mapL f₁ f₂‖ ≤ ‖f₁‖ * ‖f₂‖ := by
+  refine (ContinuousLinearMap.opNorm_le_iff (by positivity)).mpr fun x ↦ ?_
+  apply le_trans (norm_eval_le_projectiveSeminorm ..) _
+  have h_bound : ‖(tprodL 𝕜).bilinearComp f₁ f₂‖ ≤ ‖f₁‖ * ‖f₂‖ := by
+    refine ContinuousLinearMap.opNorm_le_bound₂ _ (by positivity) ?_
+    intro x y
+    simp only [bilinearComp_apply]
+    calc ‖f₁ x ⊗ₜ[𝕜] f₂ y‖
+      _ ≤ ‖f₁ x‖ * ‖f₂ y‖ := projectiveSeminorm_tprod_le (f₁ x) (f₂ y)
+      _ ≤ (‖f₁‖ * ‖x‖) * (‖f₂‖ * ‖y‖) :=
+        mul_le_mul (le_opNorm f₁ x) (le_opNorm f₂ y) (norm_nonneg _) (by positivity)
+      _ = (‖f₁‖ * ‖f₂‖) * ‖x‖ * ‖y‖ := by ring
+  calc ‖(tprodL 𝕜).bilinearComp f₁ f₂‖ * ‖x‖
+    _ ≤ (‖f₁‖ * ‖f₂‖) * ‖x‖ := mul_le_mul_of_nonneg_right h_bound (norm_nonneg x)
+
+variable (𝕜 E E')
+
+/-- The tensor of a family of linear maps from `Eᵢ` to `E'ᵢ`, as a continuous multilinear map of
+the family. -/
+@[simps! apply_apply]
+protected noncomputable def mapLBilinear :
+    (X →L[𝕜] X') →L[𝕜] (Y →L[𝕜] Y') →L[𝕜] ((X ⊗[𝕜] Y) →L[𝕜] (X' ⊗[𝕜] Y')) :=
+  LinearMap.mkContinuous₂ {
+    toFun := (LinearMap.mk₂ 𝕜 mapL
+      (fun _ _ f₂ ↦ by apply ContinuousLinearMap.coe_injective; ext; simp [TensorProduct.add_tmul])
+      (fun _ _ f₂ ↦ by apply ContinuousLinearMap.coe_injective; ext; simp [TensorProduct.smul_tmul])
+      (fun f₁ _ _ ↦ by apply ContinuousLinearMap.coe_injective; ext; simp [TensorProduct.tmul_add])
+      (fun _ f₁ _ ↦ by apply ContinuousLinearMap.coe_injective; ext; simp [TensorProduct.tmul_smul]))
+    map_add' := by
+      simp only [map_add, implies_true]
+    map_smul' := by
+      simp only [map_smul, RingHom.id_apply, implies_true]}
+  1 (fun f₁ f₂ ↦ by simp only [one_mul]; exact opNorm_mapL f₁ f₂)
+
+-- Tactic `rewrite` failed: motive is not type correct:
+--   fun _a ↦ ‖({ toFun := ?m.170, map_add' := ?m.171, map_smul' := ?m.172 } f₁) f₂‖ ≤ _a * ‖f₂‖
+-- Error: Application type mismatch: The argument
+--   ?m.172
+-- has type
+--   ∀ (m : 𝕜) (x : X →L[𝕜] X'), ?m.170 (m • x) = (RingHom.id 𝕜) m • ?m.170 x
+-- but is expected to have type
+--   ∀ (m : 𝕜) (x : X →L[𝕜] X'),
+--     { toFun := ?m.170, map_add' := ?m.171 }.toFun (m • x) =
+--       (RingHom.id 𝕜) m • { toFun := ?m.170, map_add' := ?m.171 }.toFun x
+-- in the application
+--   { toFun := ?m.170, map_add' := ?m.171, map_smul' := ?m.172 }
+
+-- variable {𝕜 E E'}
+
+-- theorem opNorm_mapLMultilinear_le : ‖mapLMultilinear 𝕜 E E'‖ ≤ 1 :=
+--   MultilinearMap.mkContinuous_norm_le _ zero_le_one _
+
+end map
+
 end NontriviallyNormedField
 
 end TensorProduct
