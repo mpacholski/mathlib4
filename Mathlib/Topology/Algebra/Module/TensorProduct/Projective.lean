@@ -9,6 +9,10 @@ public import Mathlib.Analysis.LocallyConvex.AbsConvex
 public import Mathlib.LinearAlgebra.TensorProduct.Basic
 public import Mathlib.Topology.Algebra.FilterBasis
 
+import Mathlib.Topology.Algebra.Order.Field
+
+import Mathlib.Algebra.Order.Field.Basic
+
 
 @[expose] public section
 
@@ -36,7 +40,8 @@ namespace TensorProduct
 section CommSemiring
 
 variable {R M N : Type*}
-variable [CommSemiring R] [PartialOrder R] [TopologicalSpace R]
+variable [CommSemiring R] [TopologicalSpace R]
+variable [PartialOrder R]
 variable [AddCommGroup M] [Module R M] [TopologicalSpace M] [LocallyConvexSpace R M]
 variable [AddCommGroup N] [Module R N] [TopologicalSpace N] [LocallyConvexSpace R N]
 
@@ -72,13 +77,16 @@ section NontriviallyNormedField
 variable {𝕜 E F : Type*}
 variable [NontriviallyNormedField 𝕜]
 variable [AddCommGroup E] [TopologicalSpace E] [Module 𝕜 E]
-variable [PartialOrder 𝕜]
+-- variable [PartialOrder 𝕜]
+variable [LinearOrder 𝕜]
 
 local notation:100 A:100 " ⊗ˢ[" 𝕜 "] " B:101 => Set.image2 (tmul 𝕜) A B
 
 omit [TopologicalSpace E] in
+-- variable [PartialOrder 𝕜] in
 /--
-this can be moved out to existing file-/
+this can be moved out to existing file
+-/
 lemma absConvexHull_inter_subset {s t : Set E} :
     absConvexHull 𝕜 (s ∩ t) ⊆ absConvexHull 𝕜 s ∩ absConvexHull 𝕜 t :=
   Set.subset_inter (absConvexHull_mono Set.inter_subset_left)
@@ -86,6 +94,7 @@ lemma absConvexHull_inter_subset {s t : Set E} :
 
 variable [AddCommGroup F] [TopologicalSpace F] [Module 𝕜 F]
 
+omit [LinearOrder 𝕜] in
 /-- Every element in a topological vector space over a nontrivially normed field
 can be represented as a scaled version of an element in any given neighborhood of zero. -/
 lemma exists_smul_of_mem_nhds_zero [ContinuousSMul 𝕜 E]
@@ -101,13 +110,71 @@ lemma exists_smul_of_mem_nhds_zero [ContinuousSMul 𝕜 E]
   rcases h_abs_ne.exists with ⟨r, ⟨x', hx', rfl⟩, hr_ne⟩
   exact ⟨r, hr_ne, x', hx', rfl⟩
 
+-- variable [PartialOrder 𝕜] in
 abbrev absConvexHulls (𝔘 : Set (Set E)) (𝔙 : Set (Set F)) :=
   { s | ∃ U ∈ 𝔘, ∃ B ∈ 𝔙, s = absConvexHull 𝕜 (U ⊗ˢ[𝕜] B) }
 
 variable {𝔘 : Set (Set E)} {𝔙 : Set (Set F)}
   (h𝔘 : (𝓝 (0 : E)).HasBasis 𝔘 id) (h𝔙 : (𝓝 (0 : F)).HasBasis 𝔙 id)
 
-variable [ContinuousConstSMul 𝕜 E] [ContinuousConstSMul 𝕜 F]
+variable [ContinuousSMul 𝕜 E] [ContinuousSMul 𝕜 F]
+
+variable [IsStrictOrderedRing 𝕜]
+
+omit [ContinuousSMul 𝕜 F] in
+lemma absConvexHulls_add_sub (h𝔘 : (𝓝 (0 : E)).HasBasis 𝔘 id) (_ : (𝓝 (0 : F)).HasBasis 𝔙 id)
+    {W : Set (E ⊗[𝕜] F)} (hW : W ∈ absConvexHulls 𝔘 𝔙) :
+    ∃ W' ∈ absConvexHulls 𝔘 𝔙, W' + W' ⊆ W := by
+  obtain ⟨U, hU, V, hV, rfl⟩ := hW
+  obtain ⟨c, hc, hc_lt⟩ : ∃ (c : 𝕜), 0 < ‖c‖ ∧ ‖c‖ < 1/2 := exists_norm_lt 𝕜 (by norm_num)
+  have hc_ne : c ≠ 0 := norm_pos_iff.mp hc
+  have h_cont := (continuous_const_smul c⁻¹).tendsto (0 : E)
+  rw [smul_zero] at h_cont
+  have h_preimage : (fun x : E ↦ c⁻¹ • x) ⁻¹' U ∈ 𝓝 (0 : E) :=
+    h_cont (h𝔘.mem_iff.mpr ⟨U, hU, subset_rfl⟩)
+  rcases h𝔘.mem_iff.mp h_preimage with ⟨U', hU', hU'_sub⟩
+  have h_sub : U' ⊗ˢ[𝕜] V ⊆ c • (U ⊗ˢ[𝕜] V) := by
+    rintro z ⟨x, hx, y, hy, rfl⟩
+    use (c⁻¹ • x) ⊗ₜ[𝕜] y
+    refine ⟨⟨c⁻¹ • x, hU'_sub hx, y, hy, rfl⟩, ?_⟩
+    simp only [smul_tmul, ← tmul_smul, smul_smul, mul_inv_cancel₀ hc_ne, one_smul]
+  have h_t_sub : absConvexHull 𝕜 (U' ⊗ˢ[𝕜] V) ⊆ c • absConvexHull 𝕜 (U ⊗ˢ[𝕜] V) :=
+    absConvexHull_min (h_sub.trans (Set.image_mono subset_absConvexHull))
+      ⟨balanced_absConvexHull.smul c, convex_absConvexHull.smul c⟩
+  have h_add_sub :
+      c • absConvexHull 𝕜 (U ⊗ˢ[𝕜] V) + c • absConvexHull 𝕜 (U ⊗ˢ[𝕜] V)
+      ⊆ absConvexHull 𝕜 (U ⊗ˢ[𝕜] V) := by
+    rintro z ⟨x1, ⟨y1, hy1, rfl⟩, x2, ⟨y2, hy2, rfl⟩, rfl⟩
+    have h1 : (1/2 : 𝕜) • y1 + (1/2 : 𝕜) • y2 ∈ absConvexHull 𝕜 (U ⊗ˢ[𝕜] V) :=
+      convex_absConvexHull hy1 hy2 (by positivity) (by positivity) (add_halves 1)
+    have h2 : ‖(2 : 𝕜) * c‖ ≤ 1 := by
+      have h_two : ‖(2 : 𝕜)‖ ≤ 2 := by
+        have eq_two : (2 : 𝕜) = 1 + 1 := by ring
+        rw [eq_two]
+        calc
+          ‖(1 : 𝕜) + 1‖ ≤ ‖(1 : 𝕜)‖ + ‖(1 : 𝕜)‖ := norm_add_le _ _
+          _ = 1 + 1 := by simp only [norm_one]
+          _ = 2 := by norm_num
+      calc
+        ‖(2 : 𝕜) * c‖ = ‖(2 : 𝕜)‖ * ‖c‖ := norm_mul (2 : 𝕜) c
+        _ ≤ 2 * ‖c‖ := mul_le_mul_of_nonneg_right h_two (norm_nonneg c)
+        _ ≤ 1 := by linarith [hc_lt]
+    have h3 : (2 * c) • ((1/2 : 𝕜) • y1 + (1/2 : 𝕜) • y2) ∈ absConvexHull 𝕜 (U ⊗ˢ[𝕜] V) :=
+      balanced_absConvexHull (2 * c) h2 ⟨(1/2 : 𝕜) • y1 + (1/2 : 𝕜) • y2, h1, rfl⟩
+    have h4 : (2 * c) • ((1/2 : 𝕜) • y1 + (1/2 : 𝕜) • y2) = c • y1 + c • y2 := by
+      rw [smul_add, smul_smul, smul_smul]
+      have h_scalar : (2 * c) * (1 / 2 : 𝕜) = c := by
+        calc (2 * c) * (1 / 2 : 𝕜)
+          _ = c * ((2 : 𝕜) * (1 / 2 : 𝕜)) := by rw [mul_comm (2 : 𝕜) c, mul_assoc]
+          _ = c * ((2 : 𝕜) / 2) := by rw [mul_one_div]
+          _ = c * 1 := by rw [div_self (by norm_num)]
+          _ = c := mul_one c
+      rw [h_scalar]
+    rwa [h4] at h3
+  exact ⟨absConvexHull 𝕜 (U' ⊗ˢ[𝕜] V), ⟨U', hU', V, hV, rfl⟩,
+    (Set.add_subset_add h_t_sub h_t_sub).trans h_add_sub⟩
+
+-- variable [PartialOrder 𝕜]
 
 def moduleFilterBasis : ModuleFilterBasis 𝕜 (E ⊗[𝕜] F) where
   sets := absConvexHulls 𝔘 𝔙
@@ -145,58 +212,8 @@ def moduleFilterBasis : ModuleFilterBasis 𝕜 (E ⊗[𝕜] F) where
     have h_zero_tmul : (0 : E) ⊗ₜ[𝕜] (0 : F) ∈ U ⊗ˢ[𝕜] V := Set.mem_image2_of_mem hU_zero hV_zero
     simpa [zero_tmul] using subset_absConvexHull h_zero_tmul
   add' := by
-
-    rintro s ⟨U, hU, V, hV, rfl⟩
-    -- -- 1. Find a scalar c with norm < 1/2
-    obtain ⟨c, hc, hc_lt⟩ : ∃ (c : 𝕜), 0 < ‖c‖ ∧ ‖c‖ < 1/2 := exists_norm_lt 𝕜 (by norm_num)
-    have hc_ne : c ≠ 0 := norm_pos_iff.mp hc
-
-    -- -- 2. Construct the neighborhood preimage for U under c⁻¹ • E
-    have h_inv_cont : ContinuousAt (fun x : E ↦ c⁻¹ • x) 0 :=
-      (continuous_const_smul c⁻¹).continuousAt
-    have hU_nhds : U ∈ 𝓝 (0 : E) := h𝔘.mem_of_mem hU
-    have h_preimage : (fun x : E ↦ c⁻¹ • x) ⁻¹' U ∈ 𝓝 (0 : E) := h_inv_cont (by simpa using hU_nhds)
-    rcases h𝔘.mem_iff.mp h_preimage with ⟨U', hU', hU'_sub⟩
-    have hU'_sub' : ∀ x ∈ U', c⁻¹ • x ∈ U := fun x hx ↦ hU'_sub hx
-
-    -- 3. Show that U' ⊗ˢ[𝕜] B is contained in c • (U ⊗ˢ[𝕜] B)
-    have h_sub : U' ⊗ˢ[𝕜] V ⊆ c • (U ⊗ˢ[𝕜] V) := by
-      rintro z ⟨x, hx, y, hy, rfl⟩
-      use (c⁻¹ • x) ⊗ₜ[𝕜] y
-      refine ⟨⟨c⁻¹ • x, hU'_sub' x hx, y, hy, rfl⟩, ?_⟩
-      simp only
-      rw [smul_tmul, ← tmul_smul, smul_smul, mul_inv_cancel₀ hc_ne, one_smul]
-
-    -- -- 5. Obtain the inclusion of the absolutely convex hulls
-    have h_t_sub : absConvexHull 𝕜 (U' ⊗ˢ[𝕜] V) ⊆ c • absConvexHull 𝕜 (U ⊗ˢ[𝕜] V) :=
-      absConvexHull_min (h_sub.trans (Set.image_mono subset_absConvexHull))
-        ⟨balanced_absConvexHull.smul c, convex_absConvexHull.smul c⟩
-
-    -- 7. Show that c • S + c • S ⊆ S
-    have h_add_sub :
-        c • absConvexHull 𝕜 (U ⊗ˢ[𝕜] V) + c • absConvexHull 𝕜 (U ⊗ˢ[𝕜] V)
-        ⊆ absConvexHull 𝕜 (U ⊗ˢ[𝕜] V) := by
-      rintro z ⟨x1, ⟨y1, hy1, rfl⟩, x2, ⟨y2, hy2, rfl⟩, rfl⟩
-      have h1 : (1/2 : 𝕜) • y1 + (1/2 : 𝕜) • y2 ∈ absConvexHull 𝕜 (U ⊗ˢ[𝕜] V) := sorry
-        -- convex_absConvexHull hy1 hy2 (by norm_num) (by norm_num) (by norm_num)
-      have h2 : ‖(2 : 𝕜) * c‖ ≤ 1 := calc
-        ‖(2 : 𝕜) * c‖ = ‖(2 : 𝕜)‖ * ‖c‖ := norm_mul (2 : 𝕜) c
-        _ = ‖(1 + 1 : 𝕜)‖ * ‖c‖ := sorry -- rfl
-        _ ≤ (‖(1 : 𝕜)‖ + ‖(1 : 𝕜)‖) * ‖c‖ := sorry -- mul_le_mul_of_nonneg_right (norm_add _ _) (norm_nonneg _)
-        _ = 2 * ‖c‖ := by rw [norm_one]; ring
-        _ ≤ 1 := by linarith [hc_lt]
-      have h3 : (2 * c) • ((1/2 : 𝕜) • y1 + (1/2 : 𝕜) • y2) ∈ absConvexHull 𝕜 (U ⊗ˢ[𝕜] V) :=
-        balanced_absConvexHull (2 * c) h2 ⟨(1/2 : 𝕜) • y1 + (1/2 : 𝕜) • y2, h1, rfl⟩
-      have h4 : (2 * c) • ((1/2 : 𝕜) • y1 + (1/2 : 𝕜) • y2) = c • y1 + c • y2 := by
-        simp only [smul_add, smul_smul]
-        have : (2 : 𝕜) * c * 1/2 = c := by sorry -- ring
-        -- rw [this]
-        sorry
-      rwa [h4] at h3
-
-    -- 8. Wrap up and present the witness
-    exact ⟨absConvexHull 𝕜 (U' ⊗ˢ[𝕜] V), ⟨U', hU', V, hV, rfl⟩,
-      (Set.add_subset_add h_t_sub h_t_sub).trans h_add_sub⟩
+    intro W hW
+    exact absConvexHulls_add_sub h𝔘 h𝔙 hW
   neg' := by
     intro W hW
     use W
@@ -251,10 +268,11 @@ def moduleFilterBasis : ModuleFilterBasis 𝕜 (E ⊗[𝕜] F) where
       apply subset_absConvexHull
       exact ⟨c • u, hU_sub hu, v, hv, rfl⟩
   smul_right' := by
-    intro c W hW
-    obtain ⟨U, hU, V, hV, rfl⟩ := hW
+    intro c
     induction c using TensorProduct.induction_on with
     | zero =>
+      intro W hW
+      obtain ⟨U, hU, V, hV, rfl⟩ := hW
       filter_upwards with c
       rw [smul_zero]
       apply subset_absConvexHull
@@ -263,30 +281,23 @@ def moduleFilterBasis : ModuleFilterBasis 𝕜 (E ⊗[𝕜] F) where
       have hV_zero : (0 : F) ∈ V := mem_of_mem_nhds (h𝔙.mem_iff.mpr ⟨V, hV, subset_rfl⟩)
       exact ⟨0, hU_zero, 0, hV_zero, rfl⟩
     | tmul u v =>
+      intro W hW
+      obtain ⟨U, hU, V, hV, rfl⟩ := hW
       have hU_nhds : U ∈ 𝓝 0 := h𝔘.mem_iff.mpr ⟨U, hU, subset_rfl⟩
       have hV_nhds : V ∈ 𝓝 0 := h𝔙.mem_iff.mpr ⟨V, hV, subset_rfl⟩
-
-    --   -- We need a non-zero scalar c₂ to scale v into V.
-    --   -- NontriviallyNormedField guarantees 𝓝[≠] 0 is non-trivial.
-    --  haveI : NeBot (𝓝[≠] (0 : 𝕜)) := inferInstance
       have hv : Tendsto (fun x : 𝕜 ↦ x • v) (𝓝 0) (𝓝 0) :=
         (continuous_id.smul continuous_const).tendsto' _ _ (zero_smul _ _)
       have h_ev_v : ∀ᶠ x in 𝓝[≠] (0 : 𝕜), x ≠ 0 ∧ x • v ∈ V :=
         (eventually_nhdsWithin_of_forall fun x a ↦ a).and
           (eventually_nhdsWithin_of_eventually_nhds (hv hV_nhds))
-
       obtain ⟨c₂, hc₂_ne, hc₂_V⟩ := h_ev_v.exists
-
-    --   -- With c₂ fixed, scale u using the remaining factor (x * c₂⁻¹)
       have hu : Tendsto (fun x : 𝕜 ↦ (x * c₂⁻¹) • u) (𝓝 0) (𝓝 0) := by
         have ht1 : Tendsto (fun x : 𝕜 ↦ x * c₂⁻¹) (𝓝 0) (𝓝 0) :=
           (continuous_mul_const c₂⁻¹).tendsto' _ _ (zero_mul _)
         have ht2 : Tendsto (fun y : 𝕜 ↦ y • u) (𝓝 0) (𝓝 0) :=
           (continuous_id.smul continuous_const).tendsto' _ _ (zero_smul _ _)
         exact ht2.comp ht1
-
       have h_ev_u : ∀ᶠ x in 𝓝 0, (x * c₂⁻¹) • u ∈ U := hu hU_nhds
-
       filter_upwards [h_ev_u] with x hx
       have : x • (u ⊗ₜ[𝕜] v) = ((x * c₂⁻¹) • u) ⊗ₜ[𝕜] (c₂ • v) := by
         rw [smul_tmul, tmul_smul, tmul_smul, smul_smul]
@@ -296,47 +307,16 @@ def moduleFilterBasis : ModuleFilterBasis 𝕜 (E ⊗[𝕜] F) where
       rw [this]
       apply subset_absConvexHull
       exact ⟨_, hx, _, hc₂_V, rfl⟩
-
     | add x y hx hy =>
-      haveI : NeBot (𝓝[≠] (0 : 𝕜)) := inferInstance
+      intro W hW
+      obtain ⟨W', hW', h_subset⟩ := absConvexHulls_add_sub h𝔘 h𝔙 hW
+      have hx_ev : ∀ᶠ c in 𝓝 (0 : 𝕜), c • x ∈ W' := hx hW'
+      have hy_ev : ∀ᶠ c in 𝓝 (0 : 𝕜), c • y ∈ W' := hy hW'
+      filter_upwards [hx_ev, hy_ev] with c hcx hcy
+      rw [smul_add]
+      exact h_subset (Set.add_mem_add hcx hcy)
 
-      -- Extract non-zero scalars a and b that pull x and y into the absolute convex hull
-      have hx_ev : ∀ᶠ c in 𝓝[≠] (0 : 𝕜), c ≠ 0 ∧ c • x ∈ absConvexHull 𝕜 (U ⊗ˢ[𝕜] V) :=
-        (eventually_nhdsWithin_of_forall fun x a ↦ a).and
-          (eventually_nhdsWithin_of_eventually_nhds hx)
-      obtain ⟨a, ha_ne, ha_W⟩ := hx_ev.exists
-
-      have hy_ev : ∀ᶠ c in 𝓝[≠] (0 : 𝕜), c ≠ 0 ∧ c • y ∈ absConvexHull 𝕜 (U ⊗ˢ[𝕜] V) :=
-        (eventually_nhdsWithin_of_forall fun x a ↦ a).and
-          (eventually_nhdsWithin_of_eventually_nhds hy)
-      obtain ⟨b, hb_ne, hb_W⟩ := hy_ev.exists
-
-      -- Prove that ‖c * a⁻¹‖ + ‖c * b⁻¹‖ tends to 0, meaning it will eventually be ≤ 1
-      have hc : Tendsto (fun c : 𝕜 ↦ ‖c * a⁻¹‖ + ‖c * b⁻¹‖) (𝓝 0) (𝓝 0) := by
-        have ha_lim : Tendsto (fun c : 𝕜 ↦ ‖c * a⁻¹‖) (𝓝 0) (𝓝 0) :=
-          (continuous_norm.comp (continuous_id.mul continuous_const)).tendsto' 0 0 (by simp)
-        have hb_lim : Tendsto (fun c : 𝕜 ↦ ‖c * b⁻¹‖) (𝓝 0) (𝓝 0) :=
-          (continuous_norm.comp (continuous_id.mul continuous_const)).tendsto' 0 0 (by simp)
-        -- exact (ha_lim.add hb_lim).tendsto' 0 0 (add_zero _)
-        sorry
-
-      have h_le : ∀ᶠ c in 𝓝 0, ‖c * a⁻¹‖ + ‖c * b⁻¹‖ ≤ 1 :=
-        hc (Iic_mem_nhds zero_lt_one)
-
-      filter_upwards [h_le] with c hc_le
-      have h_eq : c • (x + y) = (c * a⁻¹) • (a • x) + (c * b⁻¹) • (b • y) := by
-        rw [smul_add, ← mul_smul, ← mul_smul]
-        have ha_mul : c * a⁻¹ * a = c := by rw [mul_assoc, inv_mul_cancel₀ ha_ne, mul_one]
-        have hb_mul : c * b⁻¹ * b = c := by rw [mul_assoc, inv_mul_cancel₀ hb_ne, mul_one]
-        rw [ha_mul, hb_mul]
-      rw [h_eq]
-
-      -- Since the coefficients satisfy the AbsConvex bound (≤ 1), their combination stays inside the hull.
-      -- Note: depending on your specific AbsConvex API import, this property might be named
-      -- `absConvex_absConvexHull.smul_add_smul_le` or accessed via the underlying structure properties.
-      -- exact (absConvex_absConvexHull 𝕜 (U ⊗ˢ[𝕜] V)).smul_add_smul_le ha_W hb_W hc_le
-      sorry
-
+    -- rwa [h_final_eq] at h_bal
 lemma locallyConvexSpace_of_basis :
     @LocallyConvexSpace 𝕜 (E ⊗[𝕜] F) _ _ _ _ (moduleFilterBasis h𝔘 h𝔙).topology := by
   letI topology := (moduleFilterBasis h𝔘 h𝔙).topology (R:=𝕜)
@@ -356,8 +336,6 @@ lemma tendsto_tmul_nhds_zero_of_basis :
   rintro ⟨x, y⟩ ⟨hx : x ∈ U, hy : y ∈ B⟩
   exact subset_absConvexHull (Set.mem_image2_of_mem hx hy)
 
-variable [ContinuousSMul 𝕜 F]
-
 lemma continuousAt_tmul_right_of_basis (y : F) :
     @ContinuousAt E (E ⊗[𝕜] F) _ (moduleFilterBasis h𝔘 h𝔙).topology (fun x ↦ x ⊗ₜ[𝕜] y) 0 := by
   letI topology := (moduleFilterBasis h𝔘 h𝔙).topology (R:=𝕜)
@@ -372,8 +350,6 @@ lemma continuousAt_tmul_right_of_basis (y : F) :
   filter_upwards [h_smul] with x hx
   rw [← TensorProduct.smul_tmul]
   exact subset_absConvexHull (Set.mem_image2_of_mem hx hy')
-
-variable [ContinuousSMul 𝕜 E]
 
 lemma continuousAt_mk_apply_of_basis (x : E) :
     @ContinuousAt F (E ⊗[𝕜] F) _ (moduleFilterBasis h𝔘 h𝔙).topology ((mk 𝕜 E F) x) 0 := by
