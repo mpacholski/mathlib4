@@ -95,7 +95,7 @@ variable (u : rootsOfUnity N ℂ)
 
 omit [NeZero N] in
 lemma u_pow : u^N = 1 := by
-  ext; exact congrArg Units.val ((mem_rootsOfUnity _ _).mp u.property)
+  ext; exact congrArg Units.val ((_root_.mem_rootsOfUnity _ _).mp u.property)
 
 theorem inv_u : u⁻¹ = u ^ (N - 1) := by simp [pow_sub u NeZero.one_le, u_pow]
 lemma norm_u : ‖(u.val : ℂ)‖ = 1 :=
@@ -124,10 +124,13 @@ theorem planeWaveFun_memℓp : Memℓp (planeWaveFun N u) 2 := by
     exact hasSum_fintype _
   apply sum_sq_norm_planeWaveFun_eq_one
 
-noncomputable def planeWave : ℓ²(Fin N, ℂ) := {
-  val := planeWaveFun N u
-  property := planeWaveFun_memℓp N u
-}
+-- noncomputable def planeWave : ℓ²(Fin N, ℂ) := {
+--   val := planeWaveFun N u
+--   property := planeWaveFun_memℓp N u
+-- }
+
+noncomputable def planeWave : EuclideanSpace ℂ (Fin N) where
+  ofLp i := planeWaveFun N u i
 
 theorem isEigenvector_planeWave :
     (hamiltonian N μ t) *ᵥ planeWave N u =
@@ -162,28 +165,24 @@ theorem orthonormal_planeWaves : Orthonormal ℂ (planeWave N) := by
     rw [← abs_one, ← abs_norm, ← sq_eq_sq_iff_abs_eq_abs, one_pow]
     simp [norm]
     simp [normSq_eq_norm_sq]
-    simp [DFunLike.coe, planeWave]
+    simp only [planeWave]
     simp [sum_sq_norm_planeWaveFun_eq_one N u]
   · intro u u' h_ne
     unfold planeWave planeWaveFun
-    simp only [SubmonoidClass.coe_pow, Units.val_pow_eq_pow_val, inner_eq_tsum, RCLike.inner_apply,
-      map_div₀, map_pow, conj_ofReal, ← mul_div_assoc, div_mul_eq_mul_div, div_div, tsum_fintype]
+    simp [PiLp.inner_apply]
     simp only [star_u, InvMemClass.coe_inv, Units.val_inv_eq_inv_val, inv_pow]
-    simp only [← div_eq_mul_inv, ← div_pow, ← Finset.sum_div, div_eq_zero_iff]
-    apply Or.inl
+    simp [div_mul_eq_mul_div, mul_div, div_div, ← Finset.sum_div, div_eq_zero_iff]
     have h_ne' : (u'.val : ℂ)/(u.val : ℂ) ≠ 1:= by
       simp only [ne_eq]
       apply div_ne_one_of_ne
       intro h_eq
       rw [Units.val_inj, Subtype.val_inj] at h_eq
       exact h_ne h_eq.symm
-    rw [Fin.sum_univ_eq_sum_range, geom_sum_eq h_ne']
-    simp only [div_eq_zero_iff]
-    apply Or.inl
-    rw [div_pow]
+    simp [← div_eq_mul_inv, ← div_pow]
+    simp [Fin.sum_univ_eq_sum_range, geom_sum_eq h_ne']
+    simp [div_pow]
     norm_cast
-    rw [u_pow, u_pow]
-    norm_num
+    simp [u_pow]
 
 noncomputable instance : Fintype (rootsOfUnity N ℂ) where
   elems := Finset.univ.image fun (i : Fin N) =>
@@ -200,9 +199,7 @@ noncomputable instance : Fintype (rootsOfUnity N ℂ) where
     exact h_eq
 
 -- 2. Construct the complete orthonormal basis using the orthonormality proof
-noncomputable def planeWaveBasis : Module.Basis (rootsOfUnity N ℂ) ℂ ℓ²(Fin N, ℂ) := by
+noncomputable def planeWaveBasis :
+    Module.Basis (rootsOfUnity N ℂ) ℂ (EuclideanSpace ℂ (Fin N)) := by
   apply basisOfOrthonormalOfCardEqFinrank (orthonormal_planeWaves N) (by
-    rw [Fintype.card_eq_nat_card, Complex.card_rootsOfUnity]
-    apply Eq.symm
-    apply?
-  )
+    rw [Fintype.card_eq_nat_card, Complex.card_rootsOfUnity]; simp)
