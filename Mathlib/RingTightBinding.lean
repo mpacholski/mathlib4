@@ -4,7 +4,7 @@ import Mathlib.Analysis.Normed.Lp.lpSpace
 import Mathlib.Analysis.InnerProductSpace.l2Space
 import Mathlib.LinearAlgebra.Matrix.Hermitian
 import Mathlib.RingTheory.RootsOfUnity.Complex
-
+import Mathlib.Analysis.InnerProductSpace.PiL2
 
 variable (N : ℕ) [NeZero N]
 variable (μ : ℝ) (t : ℂ)
@@ -198,8 +198,22 @@ noncomputable instance : Fintype (rootsOfUnity N ℂ) where
     ext
     exact h_eq
 
+
 -- 2. Construct the complete orthonormal basis using the orthonormality proof
 noncomputable def planeWaveBasis :
     Module.Basis (rootsOfUnity N ℂ) ℂ (EuclideanSpace ℂ (Fin N)) := by
   apply basisOfOrthonormalOfCardEqFinrank (orthonormal_planeWaves N) (by
     rw [Fintype.card_eq_nat_card, Complex.card_rootsOfUnity]; simp)
+
+
+-- 1. State that the set of vectors is orthonormal
+theorem orthonormal_planeWavesBasis : Orthonormal ℂ (planeWaveBasis N) := by
+  unfold planeWaveBasis
+  simp only [coe_basisOfOrthonormalOfCardEqFinrank]
+  exact orthonormal_planeWaves N
+
+open Module
+
+noncomputable def planeWaveOrthonormalBasis :
+    OrthonormalBasis (rootsOfUnity N ℂ) ℂ (EuclideanSpace ℂ (Fin N)) :=
+  Basis.toOrthonormalBasis (planeWaveBasis N) (orthonormal_planeWavesBasis N)
