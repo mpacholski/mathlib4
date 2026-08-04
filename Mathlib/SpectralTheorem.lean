@@ -80,7 +80,7 @@ noncomputable def vectorSpectralMeasure : MeasureTheory.Measure ℝ :=
   RealRMK.rieszMeasure (spectralFunctional A x)
 
 lemma integral_eq_inner_cfc (f : CompactlySupportedContinuousMap ℝ ℝ) :
-    ∫ lambda, f lambda ∂(vectorSpectralMeasure A x) = Complex.re ⟪cfc f A x, x⟫_ℂ := by
+    ∫ l, f l ∂(vectorSpectralMeasure A x) = Complex.re ⟪cfc f A x, x⟫_ℂ := by
   exact RealRMK.integral_rieszMeasure (spectralFunctional A x) f
 
 end Phase1
