@@ -93,15 +93,26 @@ theorem isHermitian_hamiltonian : (hamiltonian N μ t).IsHermitian := by
 
 variable (u : rootsOfUnity N ℂ)
 
-lemma norm_u_eq_one : ‖(u.val : ℂ)‖ = 1 :=
-  norm_eq_one_of_pow_eq_one ((mem_rootsOfUnity' N u.val).mp (SetLike.coe_mem u)) (NeZero.ne N)
+omit [NeZero N] in
+lemma u_pow : u^N = 1 := by
+  ext; exact congrArg Units.val ((mem_rootsOfUnity _ _).mp u.property)
+
+theorem inv_u : u⁻¹ = u ^ (N - 1) := by simp [pow_sub u NeZero.one_le, u_pow]
+lemma norm_u : ‖(u.val : ℂ)‖ = 1 :=
+  norm_eq_one_of_pow_eq_one ((mem_rootsOfUnity' N u.val).mp u.property) (NeZero.ne N)
+
+theorem star_u : (starRingEnd ℂ) (u.val : ℂ) = (u⁻¹.val : ℂ) := by
+  simp only [InvMemClass.coe_inv, Units.val_inv_eq_inv_val]
+  field_simp
+  rw [Complex.conj_mul', norm_u N u]
+  norm_num
 
 noncomputable def planeWaveFun (i : Fin N) : ℂ := ((u ^ i.val).val : ℂ) / √N
 
 open lp
 
 theorem sum_sq_norm_planeWaveFun_eq_one : ∑ x : Fin N, ‖planeWaveFun N u x‖^2 = 1 := by
-  simp [planeWaveFun, norm_u_eq_one, one_pow]
+  simp [planeWaveFun, norm_u, one_pow]
 
 theorem planeWaveFun_memℓp : Memℓp (planeWaveFun N u) 2 := by
   unfold Memℓp
@@ -118,13 +129,9 @@ noncomputable def planeWave : ℓ²(Fin N, ℂ) := {
   property := planeWaveFun_memℓp N u
 }
 
-theorem pow_sub_one
-
 theorem isEigenvector_planeWave :
     (hamiltonian N μ t) *ᵥ planeWave N u =
     (μ + t * u.val⁻¹ + star t * u.val) • planeWave N u := by
-  -- obtain ⟨u, hu⟩ := u
-  -- simp only [mem_rootsOfUnity] at hu
   ext x'
   rw [Matrix.mulVec_apply]
   unfold hamiltonian hamiltonian_fun planeWave planeWaveFun dotProduct hopping_forward onsite
@@ -135,79 +142,48 @@ theorem isEigenvector_planeWave :
   have pow_mod : ∀ m : ℕ, u ^ m = u ^ (m % N : ℕ) := by
     intro m
     obtain ⟨uv, hu⟩ := u
-    simp
+    simp only [SubmonoidClass.mk_pow, Subtype.mk.injEq]
     exact pow_eq_pow_mod m hu
-  simp [← pow_mod]
+  simp only [SubmonoidClass.coe_pow, Units.val_pow_eq_pow_val, ← pow_mod, RCLike.star_def,
+    Nat.add_mod_mod, Units.val_inv_eq_inv_val]
   rcases N with _ | N | N
   · exact absurd rfl (NeZero.ne 0)
-  · obtain ⟨uv, hu⟩ := u
-    norm_num at hu
-    norm_num
+  · norm_num
+    have hu : u = 1 := by simpa using u.property
     simp [hu]
-  · simp [← mul_div_assoc, ← add_div]
-    apply (div_eq_iff _).mpr
-    simp [div_mul]
-    have : (√(N + 1 + 1) : ℂ) ≠ 0 := by
-      sorry
-    rw [(div_self_eq_one₀).mpr this, div_one]
-    nth_rw 2 [← sub_add_cancel ]
-
-
-
-    sorry
-    norm_num
-    obtain ⟨u, hu⟩ := u
-    -- simp at hu
-    -- simp [← pow_add]
-    -- have hN' : 1 < N := Nat.one_lt_iff_ne_zero_and_ne_one.mpr ⟨NeZero.ne N, hN⟩
-    -- simp [Nat.mod_eq_of_lt hN', pow_add]
-    -- have : u ^ (N - 1) = u^N / u := by
-      -- apply?
-    -- rw []
-    -- rw [Nat.mod_eq_of_lt hN', Nat.cast_add, Nat.cast_sub (Nat.one_le_of_lt hN'), Nat.cast_one]
-    simp [mul_add, exp_add, sub_eq_add_neg, hk,]
-    simp [mul_assoc, mul_comm]
-    ring
+  · norm_num; norm_cast; simp [inv_u]; ring
 
 open lp
-
-example (x y : ℝ) (h : x = y) : x^2 = y^2 := by
-  exact (sq_eq_sq_iff_abs_eq_abs x y).mpr (congrArg abs h)
-
-example (a b c d : ℂ) (h : a = b) (h' : c = d) : (a/c = b/d) := by
-  rw [h, h']
-
-
-
 
 -- 1. State that the set of vectors is orthonormal
 theorem orthonormal_planeWaves : Orthonormal ℂ (planeWave N) := by
   constructor
-  · intro k
+  · intro u
     rw [← abs_one, ← abs_norm, ← sq_eq_sq_iff_abs_eq_abs, one_pow]
     simp [norm]
     simp [normSq_eq_norm_sq]
     simp [DFunLike.coe, planeWave]
-    rw [sum_sq_norm_planeWaveFun_eq_one N k]
-    norm_num
-  · intro k k' h_ne
-    obtain ⟨k, hk⟩ := k; simp only [us, Set.mem_ofPred] at hk
-    obtain ⟨k', hk'⟩ := k'; simp only [us, Set.mem_ofPred] at hk'
-    simp only [ne_eq, Subtype.mk.injEq] at h_ne
+    simp [sum_sq_norm_planeWaveFun_eq_one N u]
+  · intro u u' h_ne
     unfold planeWave planeWaveFun
-    simp only [inner_eq_tsum, RCLike.inner_apply, map_div₀, ← exp_conj, map_mul, conj_I,
-      conj_ofReal, neg_mul, map_natCast, ← mul_div_assoc, div_mul_eq_mul_div, ← exp_add, div_div,
-      ← ofReal_mul, Nat.cast_nonneg, Real.mul_self_sqrt, ofReal_natCast, tsum_fintype]
-    simp_rw [← mul_neg, ← neg_mul_comm, ← mul_neg]
-    simp_rw [← add_mul, ← mul_add, ← sub_eq_add_neg]
-    have (x : ℕ) : exp (I * (k' - k) * x) = exp (I * (k' - k))^x := by
-      nth_rw 1 [mul_comm]; simp [exp_nat_mul]
-    simp_rw [this, ← Finset.sum_div]
-
-    have hkk' : exp (I * (k - k') * N) = 1 := by
-      simp_rw [mul_sub, sub_mul, sub_eq_add_neg, exp_add, exp_neg, hk, hk']
-      norm_num
-    sorry
+    simp only [SubmonoidClass.coe_pow, Units.val_pow_eq_pow_val, inner_eq_tsum, RCLike.inner_apply,
+      map_div₀, map_pow, conj_ofReal, ← mul_div_assoc, div_mul_eq_mul_div, div_div, tsum_fintype]
+    simp only [star_u, InvMemClass.coe_inv, Units.val_inv_eq_inv_val, inv_pow]
+    simp only [← div_eq_mul_inv, ← div_pow, ← Finset.sum_div, div_eq_zero_iff]
+    apply Or.inl
+    have h_ne' : (u'.val : ℂ)/(u.val : ℂ) ≠ 1:= by
+      simp only [ne_eq]
+      apply div_ne_one_of_ne
+      intro h_eq
+      rw [Units.val_inj, Subtype.val_inj] at h_eq
+      exact h_ne h_eq.symm
+    rw [Fin.sum_univ_eq_sum_range, geom_sum_eq h_ne']
+    simp only [div_eq_zero_iff]
+    apply Or.inl
+    rw [div_pow]
+    norm_cast
+    rw [u_pow, u_pow]
+    norm_num
 
 -- 2. Construct the complete orthonormal basis using the orthonormality proof
 noncomputable def planeWaveBasis : OrthonormalBasis (Fin N) ℂ (EuclideanSpace ℂ (Fin N)) :=
