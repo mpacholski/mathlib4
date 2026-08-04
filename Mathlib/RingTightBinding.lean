@@ -3,7 +3,7 @@ import Mathlib.Analysis.InnerProductSpace.PiL2
 import Mathlib.Analysis.Normed.Lp.lpSpace
 import Mathlib.Analysis.InnerProductSpace.l2Space
 import Mathlib.LinearAlgebra.Matrix.Hermitian
-
+import Mathlib.RingTheory.RootsOfUnity.Complex
 
 
 variable (N : ℕ) [NeZero N]
@@ -185,12 +185,24 @@ theorem orthonormal_planeWaves : Orthonormal ℂ (planeWave N) := by
     rw [u_pow, u_pow]
     norm_num
 
+noncomputable instance : Fintype (rootsOfUnity N ℂ) where
+  elems := Finset.univ.image fun (i : Fin N) =>
+    let val := exp (2 * Real.pi * I * (i.val / N))
+    let unit_val := Units.mk0 val (exp_ne_zero _)
+    ⟨unit_val, (Complex.mem_rootsOfUnity N unit_val).mpr
+      ⟨i, i.isLt, by simp only [unit_val, val, Units.val_mk0]⟩⟩
+  complete := by
+    intro ⟨x, hx⟩
+    obtain ⟨i, h_lt, h_eq⟩ := (Complex.mem_rootsOfUnity N x).mp hx
+    simp only [Finset.mem_image, Finset.mem_univ, true_and]
+    use ⟨i, h_lt⟩
+    ext
+    exact h_eq
+
 -- 2. Construct the complete orthonormal basis using the orthonormality proof
-noncomputable def planeWaveBasis : OrthonormalBasis (Fin N) ℂ (EuclideanSpace ℂ (Fin N)) :=
-  basisOfOrthonormalOfCardEqFinrank (orthonormal_planeWaves N) (by simp)
-
-
-open Complex
-
-example (N : ℝ) (h : N ≠ 0) : N / N = 1 := by
-  exact (div_eq_one_iff_eq h).mpr rfl
+noncomputable def planeWaveBasis : Module.Basis (rootsOfUnity N ℂ) ℂ ℓ²(Fin N, ℂ) := by
+  apply basisOfOrthonormalOfCardEqFinrank (orthonormal_planeWaves N) (by
+    rw [Fintype.card_eq_nat_card, Complex.card_rootsOfUnity]
+    apply Eq.symm
+    apply?
+  )
