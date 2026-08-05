@@ -184,20 +184,21 @@ theorem orthonormal_planeWaves : Orthonormal ℂ (planeWave N) := by
     norm_cast
     simp [u_pow]
 
-noncomputable instance : Fintype (rootsOfUnity N ℂ) where
-  elems := Finset.univ.image fun (i : Fin N) =>
-    let val := exp (2 * Real.pi * I * (i.val / N))
-    let unit_val := Units.mk0 val (exp_ne_zero _)
-    ⟨unit_val, (Complex.mem_rootsOfUnity N unit_val).mpr
-      ⟨i, i.isLt, by simp only [unit_val, val, Units.val_mk0]⟩⟩
-  complete := by
-    intro ⟨x, hx⟩
-    obtain ⟨i, h_lt, h_eq⟩ := (Complex.mem_rootsOfUnity N x).mp hx
-    simp only [Finset.mem_image, Finset.mem_univ, true_and]
-    use ⟨i, h_lt⟩
-    ext
-    exact h_eq
+-- noncomputable instance : Fintype (rootsOfUnity N ℂ) where
+--   elems := Finset.univ.image fun (i : Fin N) =>
+--     let val := exp (2 * Real.pi * I * (i.val / N))
+--     let unit_val := Units.mk0 val (exp_ne_zero _)
+--     ⟨unit_val, (Complex.mem_rootsOfUnity N unit_val).mpr
+--       ⟨i, i.isLt, by simp only [unit_val, val, Units.val_mk0]⟩⟩
+--   complete := by
+--     intro ⟨x, hx⟩
+--     obtain ⟨i, h_lt, h_eq⟩ := (Complex.mem_rootsOfUnity N x).mp hx
+--     simp only [Finset.mem_image, Finset.mem_univ, true_and]
+--     use ⟨i, h_lt⟩
+--     ext
+--     exact h_eq
 
+noncomputable local instance : Fintype (rootsOfUnity N ℂ) := Fintype.ofFinite _
 
 -- 2. Construct the complete orthonormal basis using the orthonormality proof
 noncomputable def planeWaveBasis :
@@ -213,6 +214,7 @@ theorem orthonormal_planeWavesBasis : Orthonormal ℂ (planeWaveBasis N) := by
   exact orthonormal_planeWaves N
 
 open Module
+
 
 noncomputable def planeWaveOrthonormalBasis :
     OrthonormalBasis (rootsOfUnity N ℂ) ℂ (EuclideanSpace ℂ (Fin N)) :=
